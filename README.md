@@ -33,6 +33,8 @@ A full timeline-based node for generating long-form AI video with LTX 2.3 AV —
 | Node | Description |
 |------|-------------|
 | `MuseDirectorSamplerV1` | Main director + infinite sampler with timeline UI |
+| `MuseGuide` | Standalone reference keyframe and IC-LoRA guide encoder — wires directly into LTX conditioning |
+| `MuseCropGuides` | Trims guide keyframes to match a cropped or upscaled latent — use after the spatial upscaler |
 | `LTXInfiniteDirectorSamplerV7` | Previous chunked sampler (no timeline UI) |
 
 ---
@@ -41,8 +43,7 @@ A full timeline-based node for generating long-form AI video with LTX 2.3 AV —
 
 ### ComfyUI custom nodes (install via Manager)
 
-- **WhatDreamsCost-ComfyUI** — required for DirectorGuide processing
-- **ComfyUI-VideoHelperSuite** — video preview and saving
+- **ComfyUI-VideoHelperSuite** — required for video preview and saving
 
 ### Python packages
 
@@ -227,7 +228,7 @@ A woman sits at a podcast desk, talking confidently to camera.
 
 ## Credits
 
-- Timeline UI and PromptRelay system derived from [WhatDreamsCost-ComfyUI](https://github.com/WhatDreamsCost/WhatDreamsCost-ComfyUI) by WhatDreamsCost
+- Inspired by the LTX Director approach in [WhatDreamsCost-ComfyUI](https://github.com/WhatDreamsCost/WhatDreamsCost-ComfyUI) by WhatDreamsCost — the `MuseGuide` and `MuseCropGuides` nodes are a standalone reimplementation that removes the WDC dependency entirely
 - LTX 2.3 AV model by [Lightricks](https://github.com/Lightricks/LTX-Video)
 - Built and extended by [Muse Collective](https://musecollective.co.uk)
 

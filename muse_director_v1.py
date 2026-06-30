@@ -444,21 +444,19 @@ def _build_guide_data(tdata: dict, start_frame: int, duration_frames: int,
 
 
 def _apply_guide(pos, neg, vae, video_latent, guide_data, model,
-                 motion_guide_data=None, ic_lora_name="None", ic_lora_strength=1.0):
-    """Apply guide data using LTXDirectorGuide (same as V7)."""
-    try:
-        import nodes as _nodes
-        DirectorGuide = _nodes.NODE_CLASS_MAPPINGS["LTXDirectorGuide"]
-    except Exception as exc:
-        log.warning("[MuseDirector] Guide application failed (LTXDirectorGuide not found): %s", exc)
-        return pos, neg, video_latent, model
+                 motion_guide_data=None, ic_lora_name="None", ic_lora_strength=1.0,
+                 scale_by=0.5, upscale_method="bicubic", image_attention_strength=1.0,
+                 crop="center", auto_snap_ic_grid=True, use_tiled_encode=False,
+                 tile_size=256, tile_overlap=64):
+    """Apply guide data using MuseGuide (no WDC dependency)."""
+    from .muse_guide import MuseGuide
 
     images = (guide_data or {}).get("images", [])
     if not images and not (motion_guide_data and motion_guide_data.get("segments")):
         return pos, neg, video_latent, model
 
     try:
-        result = DirectorGuide.execute(
+        result = MuseGuide.execute(
             positive=pos,
             negative=neg,
             vae=vae,
@@ -468,6 +466,14 @@ def _apply_guide(pos, neg, vae, video_latent, guide_data, model,
             model=model,
             ic_lora_name=ic_lora_name,
             ic_lora_strength=ic_lora_strength,
+            scale_by=scale_by,
+            upscale_method=upscale_method,
+            image_attention_strength=image_attention_strength,
+            crop=crop,
+            auto_snap_ic_grid=auto_snap_ic_grid,
+            use_tiled_encode=use_tiled_encode,
+            tile_size=tile_size,
+            tile_overlap=tile_overlap,
         )
         pos_out, neg_out, lat_out, model_out, _ = result
         return pos_out, neg_out, lat_out, model_out
@@ -477,14 +483,14 @@ def _apply_guide(pos, neg, vae, video_latent, guide_data, model,
 
 
 def _crop_conditioning(pos, neg, latent):
-    """Trim conditioning to match latent frame count (replicates LTXDirectorCrop)."""
+    """Trim guide keyframes from conditioning + latent after sampling."""
+    from .muse_guide import MuseCropGuides
     try:
-        from comfy_extras.nodes_lt import LTXVCropGuides
-        result = LTXVCropGuides.crop(pos, neg, latent)
+        result = MuseCropGuides().execute(pos, neg, latent)
         if result and len(result) >= 3:
             return result[0], result[1], result[2]
-    except Exception:
-        pass
+    except Exception as exc:
+        log.warning("[MuseDirector] CropGuides failed: %s", exc)
     return pos, neg, latent
 
 
@@ -644,10 +650,19 @@ class MuseDirectorSamplerV1:
                 "stage2_denoise": ("FLOAT", {"default": 0.42, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "cfg":            ("FLOAT", {"default": 1.0,  "min": 0.0, "max": 20.0, "step": 0.1}),
                 "seed":           ("INT",   {"default": 42,   "min": 0,  "max": 0xFFFFFFFFFFFFFFFF}),
-                "control_after_generate": (["fixed", "increment", "decrement", "randomize"],
-                                           {"default": "fixed"}),
                 "filename_prefix": ("STRING", {"default": "muse"}),
                 "bg_volume":       ("FLOAT", {"default": 1.0, "min": 0.0, "max": 2.0, "step": 0.05}),
+
+                # Guide settings — at end so existing workflows don't shift
+                "guide_scale_by":            ("FLOAT", {"default": 0.5,  "min": 0.01, "max": 8.0,  "step": 0.01}),
+                "guide_scale_by_s2":         ("FLOAT", {"default": 1.0,  "min": 0.01, "max": 8.0,  "step": 0.01}),
+                "guide_upscale_method":      (["bicubic", "bilinear", "nearest-exact", "area", "bislerp"], {"default": "bicubic"}),
+                "guide_image_attn_strength": ("FLOAT", {"default": 1.0,  "min": 0.0,  "max": 1.0,  "step": 0.01}),
+                "guide_crop":                (["center", "disabled"], {"default": "center"}),
+                "guide_auto_snap_ic_grid":   ("BOOLEAN", {"default": True}),
+                "guide_use_tiled_encode":    ("BOOLEAN", {"default": False}),
+                "guide_tile_size":           ("INT",   {"default": 256, "min": 64, "max": 512, "step": 32}),
+                "guide_tile_overlap":        ("INT",   {"default": 64,  "min": 16, "max": 256, "step": 16}),
 
                 # Timeline UI placeholder (hidden by JS)
                 "timeline_ui": ("STRING", {"default": ""}),
@@ -682,7 +697,10 @@ class MuseDirectorSamplerV1:
         carry_frames, carry_strength, crossfade_frames,
         ic_lora_name, ic_lora_strength,
         stage1_steps, stage2_steps, stage2_denoise, cfg,
-        seed, control_after_generate, filename_prefix,
+        seed, filename_prefix,
+        guide_scale_by=0.5, guide_scale_by_s2=1.0, guide_upscale_method="bicubic",
+        guide_image_attn_strength=1.0, guide_crop="center", guide_auto_snap_ic_grid=True,
+        guide_use_tiled_encode=False, guide_tile_size=256, guide_tile_overlap=64,
         bg_volume=1.0, bg_audio=None, base_model=None, timeline_ui="",
     ):
         if not isinstance(ic_lora_name, str):
@@ -844,6 +862,11 @@ class MuseDirectorSamplerV1:
                 pos1, neg1, lat1, patched_model = _apply_guide(
                     cond_pos, cond_neg, vae, pre_latent, guide_data, patched_model,
                     ic_lora_name=ic_lora_name, ic_lora_strength=ic_lora_strength,
+                    scale_by=guide_scale_by, upscale_method=guide_upscale_method,
+                    image_attention_strength=guide_image_attn_strength,
+                    crop=guide_crop, auto_snap_ic_grid=guide_auto_snap_ic_grid,
+                    use_tiled_encode=guide_use_tiled_encode,
+                    tile_size=guide_tile_size, tile_overlap=guide_tile_overlap,
                 )
             except Exception as exc:
                 log.warning("[MuseDirector] Guide application failed, using plain conditioning: %s", exc)
@@ -916,7 +939,12 @@ class MuseDirectorSamplerV1:
             try:
                 pos2, neg2, lat2, _ = _apply_guide(
                     pos1_c, neg1_c, vae, vid_up, guide_data, patched_model,
-                    ic_lora_name="None", ic_lora_strength=1.0,
+                    ic_lora_name=ic_lora_name, ic_lora_strength=ic_lora_strength,
+                    scale_by=guide_scale_by_s2, upscale_method=guide_upscale_method,
+                    image_attention_strength=guide_image_attn_strength,
+                    crop=guide_crop, auto_snap_ic_grid=guide_auto_snap_ic_grid,
+                    use_tiled_encode=guide_use_tiled_encode,
+                    tile_size=guide_tile_size, tile_overlap=guide_tile_overlap,
                 )[:4]
             except Exception as exc:
                 log.warning("[MuseDirector] Stage2 guide failed: %s", exc)

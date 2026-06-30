@@ -16,15 +16,24 @@ const HIDDEN_WIDGET_NAMES = ["timeline_data", "local_prompts", "segment_lengths"
   // Muse-specific hidden widgets (always hidden — managed by timeline internally)
   "start_second", "end_second", "duration_seconds", "start_frame", "end_frame", "duration_frames", "epsilon", "timeline_ui",
   // Duplicate prompt box — timeline has its own Global Prompt text area
-  "global_prompt"];
+  "global_prompt",
+  // Audio toggles — controlled by toolbar buttons above the timeline
+  "generate_audio", "custom_audio_on", "motion_guide_on",
+  // Not used / internal defaults only
+  "crossfade_frames", "filename_prefix", "display_mode",
+  // Guide internals — sensible defaults, no need to expose
+  "guide_scale_by", "guide_scale_by_s2", "guide_upscale_method", "guide_image_attn_strength",
+  "guide_crop", "guide_use_tiled_encode", "guide_tile_size", "guide_tile_overlap",
+];
 
-// Muse settings widgets — shown/hidden by the Settings toggle button
+// Muse settings widgets — shown/hidden by the Settings toggle button (cog)
 const MUSE_SETTINGS_WIDGET_NAMES = [
-  "frame_rate", "display_mode", "custom_width", "custom_height", "resize_method", "divisible_by",
-  "img_compression", "generate_audio", "custom_audio_on", "motion_guide_on",
-  "chunk_duration_seconds", "auto_chunk_threshold", "carry_frames", "carry_strength", "crossfade_frames",
-  "ic_lora_name", "ic_lora_strength", "stage1_steps", "stage2_steps", "stage2_denoise",
-  "cfg", "seed", "control_after_generate", "filename_prefix", "bg_volume",
+  "frame_rate", "custom_width", "custom_height", "resize_method", "divisible_by",
+  "img_compression",
+  "chunk_duration_seconds", "auto_chunk_threshold", "carry_frames", "carry_strength",
+  "ic_lora_name", "ic_lora_strength", "guide_auto_snap_ic_grid",
+  "stage1_steps", "stage2_steps", "stage2_denoise",
+  "cfg", "seed", "bg_volume",
 ];
 
 function hideWidget(w) {
