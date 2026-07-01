@@ -1,7 +1,7 @@
 [project]
 name = "muse-ltx-timeline"
 description = "Standalone LTX 2.3 AV director with infinite chunking, visual timeline editor, lipsync, layered audio, and per-segment prompts. No external dependencies."
-version = "1.0.0"
+version = "1.0.1"
 license = { file = "LICENSE" }
 
 [project.urls]
