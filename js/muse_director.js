@@ -6699,7 +6699,7 @@ class TimelineEditor {
         const rawEndX = ((seg.start + seg.length) / totalFrames) * width;
         const pxWidth = Math.max(1, Math.floor(rawEndX) - startX);
         const isSelected = this.selectedSegmentIds.includes(seg.id);
-        const trackY = RULER_HEIGHT + this.blockHeight + this.audioTrackHeight;
+        const trackY = RULER_HEIGHT + this.blockHeight + this.audioTrackHeight + this.bgAudioTrackHeight;
 
         if ((this._isDragging && this.selectionType === "motion" && seg.id === this._dragTargetId) || (this._ghostSegmentId && seg.id === this._ghostSegmentId)) {
           this.ctx.globalAlpha = 0.65;
